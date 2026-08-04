@@ -14,9 +14,11 @@ from src.core import Standardizer, train_test_split, roc_auc_score, accuracy_sco
 
 
 def _chronological_split(X, y, test_size=0.25):
-    # ULB creditcard.csv has Time as the last engineered column; fall back to
-    # row order for synthetic data, which is generated sequentially anyway.
-    time_col = X[:, -1] if X.shape[1] > 29 else np.arange(len(X))
+    # ULB creditcard.csv has Time as the FIRST column (Time, V1..V28, Amount,
+    # Class). Sorting by the last column (Amount) would scramble the temporal
+    # ordering, so we sort on column 0. For synthetic data — generated
+    # sequentially anyway — we keep row order.
+    time_col = X[:, 0] if X.shape[1] > 29 else np.arange(len(X))
     order = np.argsort(time_col)
     X_sorted, y_sorted = X[order], y[order]
     n_test = int(len(X_sorted) * test_size)

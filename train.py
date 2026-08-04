@@ -76,8 +76,21 @@ def main():
         if args.algorithm != "xgboost":
             print("--tune only supports --algorithm xgboost; skipping.")
         else:
-            print("Running Optuna hyperparameter tuning...")
-            best_params = tune_optuna(data, n_trials=args.n_trials)
+            # Tune on the TRAINING portion only, using the same split the final
+            # evaluation uses. Tuning on the full dataset (train+test) would let
+            # Optuna peek at test rows and inflate the reported test metrics.
+            import numpy as np
+            if args.chronological:
+                from src.model import _chronological_split
+                Xtr, Xte, ytr, yte = _chronological_split(
+                    np.asarray(data["X"], float), np.asarray(data["y"], int), test_size=0.25)
+            else:
+                from src.core import train_test_split
+                Xtr, Xte, ytr, yte = train_test_split(
+                    np.asarray(data["X"], float), np.asarray(data["y"], int), 0.25, 7)
+            tune_data = {"X": Xtr, "y": ytr, "features": data["features"]}
+            print("Running Optuna hyperparameter tuning (train split only)...")
+            best_params = tune_optuna(tune_data, n_trials=args.n_trials)
 
     print(f"Training {args.algorithm}...")
     print(f"  Calibrate={args.calibrate}, Chronological={args.chronological}")

@@ -61,15 +61,19 @@ def engineer_features(df, time_col="Time", amount_col="Amount"):
         if col in dfe.columns:
             dfe[f"{col}_x_Amount"] = dfe[col] * dfe[amount_col]
 
-    # 4. Velocity: deviation from median amount by hour
+    # 4. Velocity: deviation from median amount by hour. The per-hour median
+    #    is fitted on the TRAINING portion only (first 80%, chronological),
+    #    so test transactions never leak their own statistics into features.
+    n_train = max(1, int(len(dfe) * 0.8))
     if "hour" in dfe.columns:
-        medians = dfe.groupby("hour")[amount_col].transform("median")
-        dfe["amount_deviation"] = dfe[amount_col] - medians
+        train_medians = dfe.iloc[:n_train].groupby("hour")[amount_col].median()
+        dfe["amount_deviation"] = dfe[amount_col] - dfe["hour"].map(train_medians)
 
-    # 5. Z-score outliers for key features (from ispromadhka's notebook)
+    # 5. Z-score outliers for key features. Mean/std fitted on the TRAINING
+    #    portion only for the same leakage reason as above.
     for col in ["V14", "V12", "V10"]:
         if col in dfe.columns:
-            mu, sd = dfe[col].mean(), dfe[col].std()
+            mu, sd = dfe[col].iloc[:n_train].mean(), dfe[col].iloc[:n_train].std()
             dfe[f"{col}_zscore"] = (dfe[col] - mu) / sd
 
     return dfe
